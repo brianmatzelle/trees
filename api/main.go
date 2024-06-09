@@ -25,7 +25,10 @@ func calcMValue(x, y, xCenter, yCenter int) int {
 }
 
 func calcPValue(mValue, boardLength int) float32 {
-	return 0.0
+	maxManhattanDistance := 2 * (boardLength / 2)
+	normalizedDistance := float64(mValue) / float64(maxManhattanDistance)
+	k := 0.3 // Adjust this constant to control the steepness
+	return float32(math.Exp(k*normalizedDistance)) - 1
 }
 
 func NewBoard(odds float64, length int) *Board {
@@ -51,7 +54,7 @@ func NewBoard(odds float64, length int) *Board {
 	return board
 }
 
-func updateMValues(board *Board) {
+func (board *Board) updateMValues() {
 	if len(board.moves) == 0 {
 		return
 	}
@@ -90,7 +93,7 @@ func triggerTile(board *Board, x int, y int, initialTile bool) {
 	board.moves = append(board.moves, board.tiles[x][y])
 }
 
-func printBoard(board *Board) {
+func (board *Board) print() {
 	for i := 0; i < board.length; i++ {
 		for j := 0; j < board.length; j++ {
 			if board.tiles[i][j].fired {
@@ -132,8 +135,19 @@ func printFiredCount(board *Board) int {
 	return count
 }
 
-func runGame(board *Board) {
-	printBoard(board)
+func totalPayout(board *Board, bet float64) float64 {
+	payout := 0.0
+	for i := 0; i < board.length; i++ {
+		for j := 0; j < board.length; j++ {
+			if board.tiles[i][j].fired {
+				payout += float64(board.tiles[i][j].pValue) * bet
+			}
+		}
+	}
+	return payout
+}
+
+func runGame(board *Board, bet float64) float64 {
 	// get user input for tile to trigger
 	x := -1
 	y := -1
@@ -144,8 +158,9 @@ func runGame(board *Board) {
 		fmt.Scanln(&y)
 	}
 	triggerTile(board, x, y, true)
-	// updateMValues(board)
-	printBoard(board)
+	// board.updateMValues()
+	board.print()
+	return totalPayout(board, bet)
 }
 
 func polynomialOdds(n, k, a float64) float64 {
@@ -167,7 +182,17 @@ func main() {
 	odds := exponentialOdds(float64(length), 0.02)
 	fmt.Printf("odds: %0.2f\n", odds)
 	board := *NewBoard(odds, length)
-	runGame(&board)
+	bet := 1.0
+	// Print the board to verify
+	for i := 0; i < board.length; i++ {
+		for j := 0; j < board.length; j++ {
+			tile := board.tiles[i][j]
+			fmt.Printf("Tile (%d, %d): MValue = %d, PValue = %.4f\n", tile.x, tile.y, tile.mValue, tile.pValue)
+		}
+	}
+	payout := runGame(&board, bet)
+	fmt.Printf("Bet: %0.2f, Payout: %0.2f, Profit: %0.2f\n", bet, payout, payout-bet)
 	// printMoves(&board)
 	fmt.Printf("%d/%d (%0.2f%%) tiles on fire! \n", printFiredCount(&board), length*length, float32(printFiredCount(&board))/float32(length*length)*100)
+
 }
